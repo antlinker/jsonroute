@@ -24,8 +24,6 @@ func (j *JsonRoute) Exec(data []byte, param ...interface{}) {
 	if ok {
 		fun, ok := j.funMap[value]
 		if ok {
-			Debugf("附加参数:", param)
-			Debugf("解析数据:", data)
 			fun.ExecFun(data, param...)
 			Debugf("[%s:%v]执行完成", j.routeKey, value)
 			return
