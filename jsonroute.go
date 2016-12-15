@@ -3,6 +3,7 @@ package jsonroute
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 
 	. "github.com/antlinker/alog"
 )
@@ -19,8 +20,19 @@ type JsonRoute struct {
 
 func (j *JsonRoute) Exec(data []byte, param ...interface{}) {
 	var obj map[string]interface{}
-	json.Unmarshal(data, &obj)
+	err := json.Unmarshal(data, &obj)
+	if err != nil {
+		Warn("解码错误:", err)
+	}
 	value, ok := obj[j.routeKey]
+	if !ok {
+		ukey := strings.ToUpper(j.routeKey)
+		value, ok = obj[ukey]
+		if !ok {
+			lkey := strings.ToLower(j.routeKey)
+			value, ok = obj[lkey]
+		}
+	}
 	if ok {
 		fun, ok := j.funMap[value]
 		if ok {
@@ -29,10 +41,12 @@ func (j *JsonRoute) Exec(data []byte, param ...interface{}) {
 			return
 		}
 		Debugf("未注册的%s:%v", j.routeKey, value)
+		Debug("所有注册信息:", j.funMap)
 		return
 	}
 
 	Debug("未注册的"+j.routeKey+":", value)
+
 }
 func (j *JsonRoute) GetRouteKey() string {
 	return j.routeKey
