@@ -2,18 +2,17 @@ package jsonroute
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 
-	. "github.com/antlinker/alog"
+	"github.com/antlinker/alog"
 )
 
 func init() {
-	RegisterAlog()
+	alog.RegisterAlog()
 }
 
-var unJsonFun = reflect.ValueOf(json.Unmarshal)
-
-func callfun(funValue reflect.Value, jumpobj reflect.Value, param0 reflect.Value, ortherparam ...interface{}) {
+func callfun(funValue reflect.Value, jumpobj reflect.Value, param0 reflect.Value, ortherparam ...interface{}) error {
 	funType := funValue.Type()
 	num := funType.NumIn()
 	//Debugf("参数总数：", num)
@@ -55,50 +54,51 @@ func callfun(funValue reflect.Value, jumpobj reflect.Value, param0 reflect.Value
 		//Warnf("参数：", params)
 
 		funValue.Call(params)
-		return
+		return nil
 	}
-	Warnf("注册函数%v参数数量错误", funValue)
+	return fmt.Errorf("注册函数%v参数数量错误", funValue)
 }
 
+// ExecFuner 执行者
 type ExecFuner interface {
-	ExecFun(data []byte, param ...interface{})
+	ExecFun(data []byte, param ...interface{}) error
 }
-type ExecStructFun struct {
+type execStructFun struct {
 	key      string
 	funValue reflect.Value
 	param    reflect.Type
 	jumpObj  reflect.Value
 }
 
-func (f *ExecStructFun) ExecFun(data []byte, param ...interface{}) {
+func (f *execStructFun) ExecFun(data []byte, param ...interface{}) error {
 	obj := reflect.New(f.param).Interface()
 	json.Unmarshal(data, &obj)
 	param0 := reflect.Indirect(reflect.ValueOf(obj))
-	callfun(f.funValue, f.jumpObj, param0, param...)
+	return callfun(f.funValue, f.jumpObj, param0, param...)
 }
 
-type ExecStructPrtFun struct {
+type execStructPrtFun struct {
 	key      string
 	funValue reflect.Value
 	param    reflect.Type
 	jumpObj  reflect.Value
 }
 
-func (f *ExecStructPrtFun) ExecFun(data []byte, param ...interface{}) {
+func (f *execStructPrtFun) ExecFun(data []byte, param ...interface{}) error {
 	obj := reflect.New(f.param).Interface()
 	json.Unmarshal(data, &obj)
 	param0 := reflect.Indirect(reflect.ValueOf(obj))
-	callfun(f.funValue, f.jumpObj, param0, param...)
+	return callfun(f.funValue, f.jumpObj, param0, param...)
 }
 
-type ExecMapFun struct {
+type execMapFun struct {
 	key      string
 	funValue reflect.Value
 	param    reflect.Type
 	jumpObj  reflect.Value
 }
 
-func (f *ExecMapFun) ExecFun(data []byte, param ...interface{}) {
+func (f *execMapFun) ExecFun(data []byte, param ...interface{}) error {
 	var obj interface{}
 
 	json.Unmarshal(data, &obj)
@@ -148,51 +148,79 @@ func (f *ExecMapFun) ExecFun(data []byte, param ...interface{}) {
 		}
 
 	}
-	callfun(f.funValue, f.jumpObj, nmap, param...)
+	return callfun(f.funValue, f.jumpObj, nmap, param...)
 }
 
-type ExecSliceFun struct {
+type execSliceFun struct {
 	key      string
 	funValue reflect.Value
 	param    reflect.Type
 	jumpObj  reflect.Value
 }
 
-func (f *ExecSliceFun) ExecFun(data []byte, param ...interface{}) {
+func (f *execSliceFun) ExecFun(data []byte, param ...interface{}) error {
 	slice := reflect.MakeSlice(f.param, 0, 0)
 	obj := slice.Interface()
-	json.Unmarshal(data, &obj)
-	callfun(f.funValue, f.jumpObj, reflect.ValueOf(obj), param...)
-}
-func CreateJsonAnalysisHandle() *JsonAnalysisHandle {
-	return &JsonAnalysisHandle{funMap: make(map[string]ExecFuner, 10)}
+	err := json.Unmarshal(data, &obj)
+	if err != nil {
+		return fmt.Errorf("解析json失败%v", err)
+	}
+	if reflect.TypeOf(obj) == f.param {
+
+		return callfun(f.funValue, f.jumpObj, reflect.ValueOf(obj), param...)
+	}
+	return fmt.Errorf("解析json失败,不是预期的切片类型:%#v %#v", reflect.TypeOf(obj), f.param)
 }
 
-type JsonAnalysisHandle struct {
+// CreateJSONAnalysisHandle 创建json解析器
+func CreateJSONAnalysisHandle() JSONAnalysisHandler {
+	return &jsonAnalysisHandle{funMap: make(map[string]ExecFuner, 10)}
+}
+
+// ErrNoRegKey 未注册的key
+type ErrNoRegKey struct {
+	Key string
+}
+
+// New 创建新的错误
+func (e ErrNoRegKey) New(key string) ErrNoRegKey {
+	e.Key = key
+	return e
+}
+func (e ErrNoRegKey) Error() string {
+	return "未注册的key:" + e.Key
+}
+
+// JSONAnalysisHandler json解析处理
+type JSONAnalysisHandler interface {
+	Exec(key string, data []byte) error
+	AddHandle(key string, fun interface{}) bool
+	IsValid(fun interface{}) (ExecFuner, bool)
+}
+type jsonAnalysisHandle struct {
 	funMap map[string]ExecFuner
 }
 
-func (j *JsonAnalysisHandle) Exec(key string, data []byte) {
+func (j *jsonAnalysisHandle) Exec(key string, data []byte) error {
 	fun, ok := j.funMap[key]
 	if ok {
-		fun.ExecFun(data)
-		Debug(key, "执行完成")
-		return
+		return fun.ExecFun(data)
 	}
-	Debug("未注册的KEY:", key)
+	//Debug("未注册的KEY:", key)
+	return ErrNoRegKey{}.New(key)
 }
-func (j *JsonAnalysisHandle) AddHandle(key string, fun interface{}) bool {
+func (j *jsonAnalysisHandle) AddHandle(key string, fun interface{}) bool {
 	exefun, ok := j.IsValid(fun)
 	if ok {
 		j.funMap[key] = exefun
-		Debug("注册的KEY:", key, "成功")
+		alog.Debug("注册的KEY:", key, "成功")
 		return true
 	}
-	Debug("注册的KEY:", key, "失败")
+	alog.Debug("注册的KEY:", key, "失败")
 	return false
 }
 
-func (j *JsonAnalysisHandle) IsValid(fun interface{}) (ExecFuner, bool) {
+func (j *jsonAnalysisHandle) IsValid(fun interface{}) (ExecFuner, bool) {
 	if fun == nil {
 		return nil, false
 	}
@@ -201,31 +229,31 @@ func (j *JsonAnalysisHandle) IsValid(fun interface{}) (ExecFuner, bool) {
 	if f.Kind() == reflect.Func {
 		argnum := f.Type().NumIn()
 		if argnum != 1 {
-			Warn(f, "函数参数错误")
+			alog.Warnf("函数参数错误:%#v", f)
 			return nil, false
 		}
 		p := f.Type().In(0)
 		kind := p.Kind()
 		switch kind {
 		case reflect.Struct:
-			return &ExecStructFun{funValue: f, param: p}, true
+			return &execStructFun{funValue: f, param: p}, true
 		case reflect.Map:
 			if p.Key().Kind() == reflect.String {
-				return &ExecMapFun{funValue: f, param: p}, true
+				return &execMapFun{funValue: f, param: p}, true
 			}
 
 		case reflect.Ptr:
 			switch p.Elem().Kind() {
 			case reflect.Struct:
-				return &ExecStructPrtFun{funValue: f, param: p}, true
+				return &execStructPrtFun{funValue: f, param: p}, true
 			case reflect.Slice:
 				//if p.Elem().Kind() == reflect.Interface {
-				return &ExecSliceFun{funValue: f, param: p.Elem()}, true
+				return &execSliceFun{funValue: f, param: p.Elem()}, true
 				//}
 
 			}
 		case reflect.Slice:
-			return &ExecSliceFun{funValue: f, param: p}, true
+			return &execSliceFun{funValue: f, param: p}, true
 		}
 	}
 	return nil, false

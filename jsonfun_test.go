@@ -37,36 +37,60 @@ var _ = Describe("测试json解析路由", func() {
 		models        = []interface{}{"aaa", "bbb", "cccc", "bbb", "cccc", "cccc"}
 		jsonObjData   []byte
 		jsonArrayData []byte
-		analys        = CreateJsonAnalysisHandle()
+		analys        = CreateJSONAnalysisHandle()
 	)
 	BeforeSuite(func() {
 		jsonObjData, _ = json.Marshal(model)
 		jsonArrayData, _ = json.Marshal(models)
-		analys.AddHandle("aa", func(result []interface{}) {
+		ok := analys.AddHandle("aa", func(result []interface{}) {
 			Ω(result).Should(Equal(models))
 		})
-		analys.AddHandle("bb", func(result *ModelTest) {
+
+		Expect(ok).To(BeTrue())
+		ok = analys.AddHandle("bb", func(result *ModelTest) {
 			Expect(result.Abc).To(Equal(model.Abc))
 			Expect(result.Bcd).To(Equal(model.Bcd))
 			Expect(result.Cde).To(BeNumerically("==", model.Cde))
 		})
-		analys.AddHandle("cc", func(result ModelTest) {
+		Expect(ok).To(BeTrue())
+		ok = analys.AddHandle("cc", func(result ModelTest) {
 			Expect(result.Abc).To(Equal(model.Abc))
 			Expect(result.Bcd).To(Equal(model.Bcd))
 			Expect(result.Cde).To(BeNumerically("==", model.Cde))
 		})
-		analys.AddHandle("dd", func(result map[string]int32) {
+		Expect(ok).To(BeTrue())
+		ok = analys.AddHandle("dd", func(result map[string]int32) {
 			Expect(result["Abc"]).To(Equal(model.Abc))
 			Expect(result["Bcd"]).To(Equal(model.Bcd))
 			Expect(result["Cde"]).To(BeNumerically("==", model.Cde))
 		})
+		Expect(ok).To(BeTrue())
+		ok = analys.AddHandle("ff", func(result map[string]int32, data []byte) {
+
+		})
+		Expect(ok).To(BeFalse())
+		ok = analys.AddHandle("dd", nil)
+		Expect(ok).To(BeFalse())
 	})
 
 	It("测试结构体", func() {
-		analys.Exec("aa", jsonArrayData)
-		analys.Exec("bb", jsonObjData)
-		analys.Exec("cc", jsonObjData)
-		analys.Exec("dd", jsonObjData)
+		err := analys.Exec("aa", jsonArrayData)
+		Expect(err).NotTo(HaveOccurred())
+		err = analys.Exec("aa", jsonObjData)
+		Expect(err).To(HaveOccurred())
+		err = analys.Exec("bb", jsonObjData)
+		Expect(err).NotTo(HaveOccurred())
+		err = analys.Exec("cc", jsonObjData)
+		Expect(err).NotTo(HaveOccurred())
+		err = analys.Exec("dd", jsonObjData)
+		Expect(err).NotTo(HaveOccurred())
+		err = analys.Exec("ff", jsonObjData)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(Equal("未注册的key:ff"))
+		err = analys.Exec("ff", jsonObjData[1:])
+		Expect(err).To(HaveOccurred())
+		//err = analys.Exec("aaa", jsonArrayData)
+		//	Expect(err).NotTo(HaveOccurred())
 	})
 
 })

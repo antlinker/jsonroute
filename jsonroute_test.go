@@ -18,15 +18,65 @@ type ModelRouteTest struct {
 
 var _ = Describe("测试jsonroute解析路由测试", func() {
 	var (
-		route = CreateJsonRoute("MT", nil)
+		jump      = "abc"
+		route     = CreateJSONRoute("MT", nil)
+		routetest = CreateJSONRoute("MT", jump)
 	)
+	It("测试AddHandle", func() {
+		Expect(routetest.GetRouteKey()).To(Equal("MT"))
+		routetest.SetRouteKey("AA")
+		Expect(routetest.GetRouteKey()).To(Equal("AA"))
+	})
+	It("测试JumpObj", func() {
+		var modelbb = &ModelRouteTest{"jumpobj", "1111", "222", 33333}
+		routetest.AddHandle("jumpobj", func(result *ModelRouteTest, jumpobj string) {
+			Expect(result.Abc).To(Equal(modelbb.Abc))
+			Expect(result.Bcd).To(Equal(modelbb.Bcd))
+			Expect(jumpobj).To(Equal(jump))
+			Expect(result.Cde).To(BeNumerically("==", modelbb.Cde))
+		})
+		jsonObjData, _ := json.Marshal(modelbb)
+		routetest.Exec(jsonObjData)
+	})
+	It("测试AddHandle", func() {
 
+		ok := route.AddHandle("dd", "a")
+		Expect(ok).To(BeFalse())
+		ok = route.AddHandle("dd", nil)
+		Expect(ok).To(BeFalse())
+		ok = route.AddHandle("dd", 11)
+		Expect(ok).To(BeFalse())
+		ok = route.AddHandle("dd", int64(11))
+		Expect(ok).To(BeFalse())
+		ok = route.AddHandle("dd", true)
+		Expect(ok).To(BeFalse())
+		ok = route.AddHandle("dd", false)
+		Expect(ok).To(BeFalse())
+		ok = route.AddHandle("dd", new(ModelRouteTest))
+		Expect(ok).To(BeFalse())
+		ok = route.AddHandle("dd", make(map[string]interface{}))
+		Expect(ok).To(BeFalse())
+		ok = route.AddHandle("dd", func() {})
+		Expect(ok).To(BeFalse())
+		ok = route.AddHandle("dd", func(result ModelRouteTest) {})
+		Expect(ok).To(BeTrue())
+		ok = route.AddHandle("dd", func(result *ModelRouteTest) {})
+		Expect(ok).To(BeTrue())
+		ok = route.AddHandle("dd", func(result map[string]interface{}) {})
+		Expect(ok).To(BeTrue())
+		ok = route.AddHandle("dd", func(result map[string]string) {})
+		Expect(ok).To(BeTrue())
+	})
 	It("测试结构体", func() {
 
 		var modelbb = &ModelRouteTest{"bb", "1111", "222", 33333}
 		var modelcc = &ModelRouteTest{"cc", "1111", "222", 33333}
 		var modeldd = &ModelRouteTest{"dd", "1111", "222", 33333}
-
+		var modelEE = &ModelRouteTest{"EE", "1111", "222", 33333}
+		var modelFF = &ModelRouteTest{"ff", "1111", "222", 33333}
+		var modelGg = &ModelRouteTest{"Gg", "1111", "222", 33333}
+		var modelHh = &ModelRouteTest{"Hh", "1111", "222", 33333}
+		var modelNoreg = &ModelRouteTest{"noreg", "1111", "222", 33333}
 		route.AddHandle("bb", func(result *ModelRouteTest) {
 			Expect(result.Abc).To(Equal(modelbb.Abc))
 			Expect(result.Bcd).To(Equal(modelbb.Bcd))
@@ -42,6 +92,30 @@ var _ = Describe("测试jsonroute解析路由测试", func() {
 			Expect(result["Bcd"]).To(Equal(modeldd.Bcd))
 			Expect(result["Cde"]).To(BeNumerically("==", modeldd.Cde))
 		})
+		route.AddHandle("ee", func(result map[string]interface{}) {
+			Expect(result["Abc"]).To(Equal(modelEE.Abc))
+			Expect(result["Bcd"]).To(Equal(modelEE.Bcd))
+			Expect(result["Cde"]).To(BeNumerically("==", modelEE.Cde))
+		})
+		route.AddHandle("FF", func(result map[string]interface{}) {
+			Expect(result["Abc"]).To(Equal(modelFF.Abc))
+			Expect(result["Bcd"]).To(Equal(modelFF.Bcd))
+			Expect(result["Cde"]).To(BeNumerically("==", modelFF.Cde))
+		})
+		route.AddHandle("Gg", func(result map[string]interface{}) {
+			Expect(result["Abc"]).To(Equal(modelGg.Abc))
+			Expect(result["Bcd"]).To(Equal(modelGg.Bcd))
+			Expect(result["Cde"]).To(BeNumerically("==", modelGg.Cde))
+		})
+		route.AddHandle("hh", func(data []byte, result map[string]interface{}) {
+			Expect(result["Abc"]).To(Equal(modelHh.Abc))
+			Expect(result["Bcd"]).To(Equal(modelHh.Bcd))
+			Expect(result["Cde"]).To(BeNumerically("==", modelHh.Cde))
+			var r ModelRouteTest
+			err := json.Unmarshal(data, &r)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(r).To(MatchJSON(modelHh))
+		})
 
 		jsonObjData, _ := json.Marshal(modelbb)
 
@@ -50,6 +124,19 @@ var _ = Describe("测试jsonroute解析路由测试", func() {
 		route.Exec(jsonObjDatacc)
 		jsonObjDatadd, _ := json.Marshal(modeldd)
 		route.Exec(jsonObjDatadd)
+		jsonObjDataee, _ := json.Marshal(modelEE)
+		route.Exec(jsonObjDataee)
+		jsonObjDataff, _ := json.Marshal(modelFF)
+		route.Exec(jsonObjDataff)
+		jsonObjDatagg, _ := json.Marshal(modelGg)
+		route.Exec(jsonObjDatagg)
+		jsonObjDatahh, _ := json.Marshal(modelHh)
+		route.Exec(jsonObjDatahh)
+		jsonObjDataNoreg, _ := json.Marshal(modelNoreg)
+		route.Exec(jsonObjDataNoreg)
+		jsonObjDataErr, _ := json.Marshal(modelNoreg)
+		jsonObjDataErr = jsonObjDataErr[1:]
+		route.Exec(jsonObjDataErr)
 	})
 
 })

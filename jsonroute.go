@@ -2,70 +2,77 @@ package jsonroute
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 
-	. "github.com/antlinker/alog"
+	"github.com/antlinker/alog"
 )
 
-func CreateJsonRoute(routeKey string, jump interface{}) *JsonRoute {
-	return &JsonRoute{routeKey: routeKey, funMap: make(map[interface{}]ExecFuner, 16), jumpObj: reflect.ValueOf(jump)}
+// CreateJSONRoute 创建json路由
+func CreateJSONRoute(routeKey string, jump interface{}) JSONRouter {
+	return &jsonRoute{routeKey: routeKey, funMap: make(map[interface{}]ExecFuner, 16), jumpObj: reflect.ValueOf(jump)}
 }
 
-type JsonRoute struct {
+// JSONRouter json路由
+type JSONRouter interface {
+	Exec(data []byte, param ...interface{}) error
+	GetRouteKey() string
+	SetRouteKey(key string)
+	AddHandle(value interface{}, fun interface{}) bool
+}
+
+type jsonRoute struct {
 	routeKey string
 	funMap   map[interface{}]ExecFuner
 	jumpObj  reflect.Value
 }
 
-func (j *JsonRoute) Exec(data []byte, param ...interface{}) {
+func (j *jsonRoute) Exec(data []byte, param ...interface{}) error {
 	var obj map[string]interface{}
 	err := json.Unmarshal(data, &obj)
 	if err != nil {
-		Warn("解码错误:", err)
+		return fmt.Errorf("json解码错误:%v", err)
 	}
 	value, ok := obj[j.routeKey]
-	if !ok {
-		ukey := strings.ToUpper(j.routeKey)
-		value, ok = obj[ukey]
-		if !ok {
-			lkey := strings.ToLower(j.routeKey)
-			value, ok = obj[lkey]
-		}
-	}
+
 	if ok {
 		fun, ok := j.funMap[value]
-		if ok {
-			fun.ExecFun(data, param...)
-			Debugf("[%s:%v]执行完成", j.routeKey, value)
-			return
+		if !ok {
+			ukey := strings.ToUpper(j.routeKey)
+			fun, ok = j.funMap[ukey]
+			if !ok {
+				lkey := strings.ToLower(j.routeKey)
+				fun, ok = j.funMap[lkey]
+			}
 		}
-		Debugf("未注册的%s:%v", j.routeKey, value)
-		Debug("所有注册信息:", j.funMap)
-		return
+		if ok {
+			return fun.ExecFun(data, param...)
+			//	Debugf("[%s:%v]执行完成", j.routeKey, value)
+
+		}
+		return fmt.Errorf("未注册的%s:%v", j.routeKey, value)
 	}
-
-	Debug("未注册的"+j.routeKey+":", value)
-
+	return fmt.Errorf("报文格式错误：缺少%s字段", j.routeKey)
 }
-func (j *JsonRoute) GetRouteKey() string {
+func (j *jsonRoute) GetRouteKey() string {
 	return j.routeKey
 }
-func (j *JsonRoute) SetRouteKey(key string) {
+func (j *jsonRoute) SetRouteKey(key string) {
 	j.routeKey = key
 }
-func (j *JsonRoute) AddHandle(value interface{}, fun interface{}) bool {
+func (j *jsonRoute) AddHandle(value interface{}, fun interface{}) bool {
 	exefun, ok := j.IsValid(fun)
 	if ok {
 		j.funMap[value] = exefun
-		Debugf("注册[%s:%v]成功", j.routeKey, value)
+		alog.Debugf("注册[%s:%v]成功", j.routeKey, value)
 		return true
 	}
-	Debugf("注册[%s:%v]失败", j.routeKey, value)
+	alog.Debugf("注册[%s:%v]失败", j.routeKey, value)
 	return false
 }
 
-func (j *JsonRoute) IsValid(fun interface{}) (ExecFuner, bool) {
+func (j *jsonRoute) IsValid(fun interface{}) (ExecFuner, bool) {
 	if fun == nil {
 		return nil, false
 	}
@@ -76,24 +83,22 @@ func (j *JsonRoute) IsValid(fun interface{}) (ExecFuner, bool) {
 		argnum := ftype.NumIn()
 
 		if argnum == 0 {
-			Warn(f, "函数参数错误")
+			alog.Warn(f, "函数参数错误")
 			return nil, false
 		}
-		Debugf("注册函数%v", ftype)
+		alog.Debugf("注册函数%v", ftype)
 		for n := 0; n < argnum; n++ {
 
-			Debugf("\t参数%d:%v", n, ftype.In(n))
+			alog.Debugf("\t参数%d:%v", n, ftype.In(n))
 		}
 
 		p := ftype.In(0)
 		jumpObj := reflect.ValueOf(nil)
-
-		if j.jumpObj.IsValid() && !j.jumpObj.IsNil() {
-			Debugf("跳过对象%v", j.jumpObj.Type())
+		if j.jumpObj.IsValid() {
 
 			if reflect.DeepEqual(j.jumpObj.Type(), p) {
 				if argnum == 1 {
-					Warn(f, "函数参数错误")
+					alog.Warn(f, "函数参数错误")
 					return nil, false
 				}
 				p = ftype.In(1)
@@ -102,22 +107,22 @@ func (j *JsonRoute) IsValid(fun interface{}) (ExecFuner, bool) {
 
 		}
 		kind := p.Kind()
-		Debug("p.Kind:", kind)
+		alog.Debug("p.Kind:", kind)
 		switch kind {
 		case reflect.Struct:
-			return &ExecStructFun{jumpObj: jumpObj, funValue: f, param: p}, true
+			return &execStructFun{jumpObj: jumpObj, funValue: f, param: p}, true
 		case reflect.Map:
 			if p.Key().Kind() == reflect.String {
-				return &ExecMapFun{jumpObj: jumpObj, funValue: f, param: p}, true
+				return &execMapFun{jumpObj: jumpObj, funValue: f, param: p}, true
 			}
 
 		case reflect.Ptr:
 			switch p.Elem().Kind() {
 			case reflect.Struct:
-				return &ExecStructPrtFun{jumpObj: jumpObj, funValue: f, param: p}, true
+				return &execStructPrtFun{jumpObj: jumpObj, funValue: f, param: p}, true
 			}
 		case reflect.Slice:
-			return &ExecSliceFun{jumpObj: jumpObj, funValue: f, param: p}, true
+			return &execSliceFun{jumpObj: jumpObj, funValue: f, param: p}, true
 		}
 	}
 	return nil, false
