@@ -37,12 +37,13 @@ func (j *jsonRoute) Exec(data []byte, param ...interface{}) error {
 	value, ok := obj[j.routeKey]
 
 	if ok {
-		fun, ok := j.funMap[value]
+		v := fmt.Sprintf("%v", value)
+		fun, ok := j.funMap[v]
 		if !ok {
-			ukey := strings.ToUpper(j.routeKey)
+			ukey := strings.ToUpper(v)
 			fun, ok = j.funMap[ukey]
 			if !ok {
-				lkey := strings.ToLower(j.routeKey)
+				lkey := strings.ToLower(v)
 				fun, ok = j.funMap[lkey]
 			}
 		}
