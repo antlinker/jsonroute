@@ -10,48 +10,49 @@ import (
 
 func init() {
 	alog.RegisterAlog()
+	alog.SetEnabled(false)
 }
 
 func callfun(funValue reflect.Value, jumpobj reflect.Value, param0 reflect.Value, ortherparam ...interface{}) error {
 	funType := funValue.Type()
 	num := funType.NumIn()
-	alog.Debugf("参数总数：", num)
+	//	alog.Debugf("参数总数：", num)
 	if num > 0 {
 		params := make([]reflect.Value, num)
 		start := 1
 		if jumpobj.IsValid() && !jumpobj.IsNil() {
 			params[0] = jumpobj
-			alog.Debugf("参数0:%v：", jumpobj)
+			//	alog.Debugf("参数0:%v：", jumpobj)
 			params[1] = param0
-			alog.Debugf("参数1:%v：", param0)
+			//	alog.Debugf("参数1:%v：", param0)
 			start = 2
 		} else {
 			params[0] = param0
-			alog.Debugf("参数0:%v：", param0)
+			//	alog.Debugf("参数0:%v：", param0)
 		}
-
+		//	alog.Debugf("其他参数:%v：", ortherparam)
 		if len(ortherparam) > 0 {
 			plen := len(ortherparam) + start
 			for i := start; i < num && i < plen; i++ {
 				pvalue := reflect.ValueOf(ortherparam[i-start])
-				alog.Warnf("参数%d：%v=====%v ", i, funType.In(i).Kind(), pvalue.Kind())
+				//	alog.Warnf("参数%d：%v=====%v ", i, funType.In(i).Kind(), pvalue.Kind())
 				ftype := funType.In(i)
 				if ftype.Kind() == pvalue.Kind() {
 
-					alog.Debugf("参数%d:%v：", i, pvalue)
+					//	alog.Debugf("参数%d:%v：", i, pvalue)
 					params[i] = pvalue
 					continue
 				}
 				if ftype.Kind() == reflect.Interface && pvalue.Type().Implements(ftype) {
-					alog.Debugf("参数%d:%v：", i, pvalue)
+					//		alog.Debugf("参数%d:%v：", i, pvalue)
 					params[i] = pvalue
 					continue
 				}
 
 			}
 		}
-		alog.Warnf("执行函数：", funValue.Type())
-		alog.Warnf("参数：%v", params)
+		//alog.Warnf("执行函数：", funValue.Type())
+		//alog.Warnf("参数：%v", params)
 
 		funValue.Call(params)
 		return nil

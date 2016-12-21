@@ -111,10 +111,10 @@ var _ = Describe("测试jsonroute解析路由测试", func() {
 			Expect(result["Abc"]).To(Equal(modelHh.Abc))
 			Expect(result["Bcd"]).To(Equal(modelHh.Bcd))
 			Expect(result["Cde"]).To(BeNumerically("==", modelHh.Cde))
-			// var r ModelRouteTest
-			// err := json.Unmarshal(data, &r)
-			// Expect(err).NotTo(HaveOccurred())
-			// Expect(r).To(MatchJSON(modelHh))
+			var r ModelRouteTest
+			err := json.Unmarshal(data, &r)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(r).To(Equal(*modelHh))
 		})
 
 		jsonObjData, _ := json.Marshal(modelbb)
@@ -138,7 +138,7 @@ var _ = Describe("测试jsonroute解析路由测试", func() {
 		err = route.Exec(jsonObjDatagg)
 		Expect(err).NotTo(HaveOccurred())
 		jsonObjDatahh, _ := json.Marshal(modelHh)
-		err = route.Exec(jsonObjDatahh)
+		err = route.Exec(jsonObjDatahh, jsonObjDatahh)
 		Expect(err).NotTo(HaveOccurred())
 
 		jsonObjDataNoreg, _ := json.Marshal(modelNoreg)

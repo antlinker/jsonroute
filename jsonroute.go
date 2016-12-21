@@ -48,6 +48,7 @@ func (j *jsonRoute) Exec(data []byte, param ...interface{}) error {
 			}
 		}
 		if ok {
+			//	alog.Debugf("[%s:%v]执行完成", j.routeKey, param)
 			return fun.ExecFun(data, param...)
 			//	Debugf("[%s:%v]执行完成", j.routeKey, value)
 
@@ -108,7 +109,6 @@ func (j *jsonRoute) IsValid(fun interface{}) (ExecFuner, bool) {
 
 		}
 		kind := p.Kind()
-		alog.Debug("p.Kind:", kind)
 		switch kind {
 		case reflect.Struct:
 			return &execStructFun{jumpObj: jumpObj, funValue: f, param: p}, true
