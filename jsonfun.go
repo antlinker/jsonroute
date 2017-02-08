@@ -102,7 +102,10 @@ type execMapFun struct {
 func (f *execMapFun) ExecFun(data []byte, param ...interface{}) error {
 	var obj interface{}
 
-	json.Unmarshal(data, &obj)
+	err := json.Unmarshal(data, &obj)
+	if err != nil {
+		return err
+	}
 	pmap := obj.(map[string]interface{})
 
 	nmap := reflect.MakeMap(f.param)
@@ -142,6 +145,10 @@ func (f *execMapFun) ExecFun(data []byte, param ...interface{}) error {
 	case reflect.Float32:
 		for k, v := range pmap {
 			nmap.SetMapIndex(reflect.ValueOf(k), reflect.ValueOf(float32(v.(float64))))
+		}
+	case reflect.Float64:
+		for k, v := range pmap {
+			nmap.SetMapIndex(reflect.ValueOf(k), reflect.ValueOf(v.(float64)))
 		}
 	default:
 		for k, v := range pmap {

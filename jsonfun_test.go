@@ -33,15 +33,19 @@ func testObjectfull(result ModelTest) {
 
 var _ = Describe("测试json解析路由", func() {
 	var (
-		model         = &ModelTest{1111, 1111, 33333}
-		models        = []interface{}{"aaa", "bbb", "cccc", "bbb", "cccc", "cccc"}
-		jsonObjData   []byte
-		jsonArrayData []byte
-		analys        = CreateJSONAnalysisHandle()
+		model          = &ModelTest{1111, 1111, 33333}
+		models         = []interface{}{"aaa", "bbb", "cccc", "bbb", "cccc", "cccc"}
+		jsonObjData    []byte
+		jsonArrayData  []byte
+		jsonErrData    []byte
+		jsonObjDataMap []byte
+		analys         = CreateJSONAnalysisHandle()
 	)
 	BeforeSuite(func() {
 		jsonObjData, _ = json.Marshal(model)
 		jsonArrayData, _ = json.Marshal(models)
+		jsonErrData = []byte("{aaa")
+		jsonObjDataMap = []byte("{\"test\":1,\"test2\":1.1,\"test3\":\"test3\"}")
 		ok := analys.AddHandle("aa", func(result []interface{}) {
 			Ω(result).Should(Equal(models))
 		})
@@ -63,6 +67,12 @@ var _ = Describe("测试json解析路由", func() {
 			Expect(result["Abc"]).To(Equal(model.Abc))
 			Expect(result["Bcd"]).To(Equal(model.Bcd))
 			Expect(result["Cde"]).To(BeNumerically("==", model.Cde))
+		})
+		Expect(ok).To(BeTrue())
+		ok = analys.AddHandle("map", func(result map[string]string) {
+			Expect(result["test"]).To(Equal(float64(1)))
+			Expect(result["test2"]).To(Equal(1.1))
+			Expect(result["test3"]).To(Equal("test3"))
 		})
 		Expect(ok).To(BeTrue())
 		ok = analys.AddHandle("ff", func(result map[string]int32, data []byte) {
@@ -89,6 +99,10 @@ var _ = Describe("测试json解析路由", func() {
 		Expect(err.Error()).To(Equal("未注册的key:ff"))
 		err = analys.Exec("ff", jsonObjData[1:])
 		Expect(err).To(HaveOccurred())
+		err = analys.Exec("aa", jsonErrData)
+		Expect(err).To(HaveOccurred())
+		err = analys.Exec("map", jsonObjDataMap)
+		Expect(err).NotTo(HaveOccurred())
 		//err = analys.Exec("aaa", jsonArrayData)
 		//	Expect(err).NotTo(HaveOccurred())
 	})
